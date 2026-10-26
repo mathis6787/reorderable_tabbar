@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:reorderable_tabbar/reorderable_tabbar.dart';
 
 void main() {
@@ -6,22 +6,20 @@ void main() {
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({Key? key}) : super(key: key);
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Reorderable TabBar',
-      theme: ThemeData(
-        useMaterial3: true,
-      ),
+      theme: ThemeData(useMaterial3: true),
       home: const ReorderableTabBarPage(),
     );
   }
 }
 
 class ReorderableTabBarPage extends StatefulWidget {
-  const ReorderableTabBarPage({Key? key}) : super(key: key);
+  const ReorderableTabBarPage({super.key});
 
   @override
   State<ReorderableTabBarPage> createState() => _ReorderableTabBarPageState();
@@ -30,21 +28,12 @@ class ReorderableTabBarPage extends StatefulWidget {
 extension StringExt on String {
   Text get text => Text(this);
   Widget tab(int index) {
-    return Tab(
-      text: "Tab $this",
-    );
+    return Tab(text: "Tab $this");
   }
 }
 
 class _ReorderableTabBarPageState extends State<ReorderableTabBarPage> {
-  PageController pageController = PageController();
-
-  List<String> tabs = [
-    "1",
-    "2",
-    "3",
-    "4",
-  ];
+  List<String> tabs = ["1", "2", "3", "4"];
 
   bool isScrollable = false;
   bool tabSizeIsLabel = false;
@@ -111,9 +100,7 @@ class _ReorderableTabBarPageState extends State<ReorderableTabBarPage> {
         ),
         body: TabBarView(
           children: tabs.map((e) {
-            return Center(
-              child: ("$e. Page").text,
-            );
+            return Center(child: ("$e. Page").text);
           }).toList(),
         ),
       ),
