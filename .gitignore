@@ -20,6 +20,9 @@
 # is commented out by default.
 #.vscode/
 
+# Machine-specific VS Code CMake configuration
+/.vscode/settings.json
+
 # Flutter/Dart/Pub related
 # Libraries should not include pubspec.lock, per https://dart.dev/guides/libraries/private-files#pubspeclock.
 /pubspec.lock
@@ -27,3 +30,9 @@
 .dart_tool/
 .packages
 build/
+
+# Local FVM SDK links
+.fvm/
+
+# Local browser validation artifacts
+.playwright-mcp/

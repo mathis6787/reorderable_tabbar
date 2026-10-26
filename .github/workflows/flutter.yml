@@ -1,0 +1,40 @@
+name: Flutter
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - flutter: '3.47.0'
+            material: '1.7.0'
+          - flutter: '3.47.8'
+            material: '1.8.0'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ matrix.flutter }}
+          channel: stable
+          cache: true
+      - name: Select Material UI version
+        run: |
+          for directory in . example; do
+            printf 'dependency_overrides:\n  material_ui: %s\n' '${{ matrix.material }}' > "$directory/pubspec_overrides.yaml"
+          done
+      - run: flutter pub get
+      - run: dart format --output=none --set-exit-if-changed lib test example/lib example/test
+      - run: flutter analyze --fatal-infos
+      - run: flutter test
+      - run: flutter pub get
+        working-directory: example
+      - run: flutter analyze --fatal-infos
+        working-directory: example
+      - run: flutter test
+        working-directory: example
+      - run: flutter build web
+        working-directory: example
