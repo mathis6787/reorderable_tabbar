@@ -316,8 +316,16 @@ class ReorderableTabBar extends StatefulWidget implements PreferredSizeWidget {
     this.reorderingTabBackgroundColor,
     this.tabBackgroundColor,
     this.buildDefaultDragHandles = true,
+    this.enableReordering = true,
     this.useDelayedDragStartListener = false,
   }) : assert(indicator != null || (indicatorWeight > 0.0));
+
+  /// Whether tabs can be reordered by dragging.
+  ///
+  /// When false, drag handles and drag listeners are disabled while taps and
+  /// scrolling remain available. A pending drop cannot reorder tabs after this
+  /// becomes false. Defaults to true.
+  final bool enableReordering;
 
   /// if false use `useDelayedDragStartListener` variable
   final bool buildDefaultDragHandles;
@@ -1121,7 +1129,7 @@ class _ReorderableTabBarState extends State<ReorderableTabBar> {
     for (var i = 0; i < wrappedTabs.length; i++) {
       Widget child = wrappedTabs[i];
 
-      if (!widget.buildDefaultDragHandles) {
+      if (widget.enableReordering && !widget.buildDefaultDragHandles) {
         if (widget.useDelayedDragStartListener) {
           child = ReorderableDelayedDragStartListener(index: i, child: child);
         } else {
@@ -1172,7 +1180,8 @@ class _ReorderableTabBarState extends State<ReorderableTabBar> {
           height: height,
           width: double.maxFinite,
           child: ReorderableListView(
-            buildDefaultDragHandles: widget.buildDefaultDragHandles,
+            buildDefaultDragHandles:
+                widget.enableReordering && widget.buildDefaultDragHandles,
             scrollCacheExtent: const ScrollCacheExtent.pixels(double.maxFinite),
             physics: widget.physics,
             dragStartBehavior: widget.dragStartBehavior,
@@ -1193,7 +1202,7 @@ class _ReorderableTabBarState extends State<ReorderableTabBar> {
               );
             },
             onReorderItem: (oldIndex, newIndex) {
-              if (widget.onReorder != null) {
+              if (widget.enableReordering && widget.onReorder != null) {
                 isReordered = Reordered(oldIndex: oldIndex, newIndex: newIndex);
                 widget.onReorder!(oldIndex, newIndex);
               }

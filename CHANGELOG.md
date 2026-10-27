@@ -1,5 +1,8 @@
 ## Unreleased
 
+* Add `enableReordering` to disable drag handles and reordering without disabling
+  tab selection or scrolling, including when toggled during a drag.
+
 * Add opt-in `indicatorFollowsDrag` to keep the selected tab indicator attached
   during reordering, including drag proxies, drop animations and cancellation.
 * Avoid replaying the selection animation when a followed indicator returns

@@ -82,6 +82,10 @@ label and indicator properties on `ReorderableTabBar`. `overlayColor` accepts a
 `defaultIndicator: true` selects an underline, and `indicator` accepts a custom
 `Decoration`.
 
+Set `enableReordering: false` to disable dragging and hide drag handles while
+keeping tab selection and scrolling available. It defaults to `true` and can be
+changed at runtime, for example when entering or leaving a customization mode.
+
 Set `indicatorFollowsDrag: true` to keep the selected indicator attached to its
 tab during reordering, including in the drag proxy and when another tab pushes
 it. The indicator follows through the drop animation and returns to the normal
