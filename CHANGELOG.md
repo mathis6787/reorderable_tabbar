@@ -1,5 +1,9 @@
 ## Unreleased
 
+* Match Material tab hover, focus and pressed overlays, including tab theme overrides.
+* Draw the Material 3 divider using `dividerColor` and `dividerHeight` from the widget or tab theme.
+* Expose tab roles and selection while retaining accessible reorder actions.
+
 * Add `enableReordering` to disable drag handles and reordering without disabling
   tab selection or scrolling, including when toggled during a drag.
 

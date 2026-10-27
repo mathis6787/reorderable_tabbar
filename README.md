@@ -82,6 +82,12 @@ label and indicator properties on `ReorderableTabBar`. `overlayColor` accepts a
 `defaultIndicator: true` selects an underline, and `indicator` accepts a custom
 `Decoration`.
 
+Interaction overlays and splash styling inherit `TabBarThemeData`, with the
+same selected/hovered/focused/pressed colors as Material tabs. Material 3 draws
+the tab theme's full-width divider; `dividerColor` and `dividerHeight` override
+it on an individual bar. Set `dividerHeight: 0` to hide it. Tabs expose their
+selection and tab roles, including the accessible move actions.
+
 Set `enableReordering: false` to disable dragging and hide drag handles while
 keeping tab selection and scrolling available. It defaults to `true` and can be
 changed at runtime, for example when entering or leaving a customization mode.
