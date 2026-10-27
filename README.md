@@ -82,6 +82,12 @@ label and indicator properties on `ReorderableTabBar`. `overlayColor` accepts a
 `defaultIndicator: true` selects an underline, and `indicator` accepts a custom
 `Decoration`.
 
+Set `indicatorFollowsDrag: true` to keep the selected indicator attached to its
+tab during reordering, including in the drag proxy and when another tab pushes
+it. The indicator follows through the drop animation and returns to the normal
+animated tab strip on drop or cancellation. It supports label/full-tab sizing,
+padding and custom indicator decorations. The default is `false`.
+
 ## Example and validation
 
 The [example](example/lib/main.dart) supports selecting, reordering, and adding

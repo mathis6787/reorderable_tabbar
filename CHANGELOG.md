@@ -1,3 +1,10 @@
+## Unreleased
+
+* Add opt-in `indicatorFollowsDrag` to keep the selected tab indicator attached
+  during reordering, including drag proxies, drop animations and cancellation.
+* Avoid replaying the selection animation when a followed indicator returns
+  from the drag proxy to the tab strip after a drop.
+
 ## 2.0.0
 
 * Require Flutter 3.47.0 / Dart 3.13.0 and pin development to Flutter 3.47.8.

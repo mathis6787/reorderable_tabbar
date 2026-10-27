@@ -145,7 +145,7 @@ class _IndicatorPainter extends CustomPainter {
         2.0;
   }
 
-  Rect indicatorRect(Size tabBarSize, int tabIndex) {
+  Rect indicatorRect(Size tabBarSize, int tabIndex, {double? labelWidth}) {
     assert(_currentTabOffsets != null);
     assert(_currentTextDirection != null);
     assert(_currentTabOffsets!.isNotEmpty);
@@ -164,7 +164,8 @@ class _IndicatorPainter extends CustomPainter {
     }
 
     if (indicatorSize == TabBarIndicatorSize.label) {
-      final double tabWidth = tabKeys[tabIndex].currentContext!.size!.width;
+      final double tabWidth =
+          labelWidth ?? tabKeys[tabIndex].currentContext!.size!.width;
       final double delta = ((tabRight - tabLeft) - tabWidth) / 2.0;
       tabLeft += delta;
       tabRight -= delta;
@@ -310,6 +311,7 @@ class ReorderableTabBar extends StatefulWidget implements PreferredSizeWidget {
     this.physics,
     this.onReorder,
     this.defaultIndicator = false,
+    this.indicatorFollowsDrag = false,
     this.tabBorderRadius,
     this.reorderingTabBackgroundColor,
     this.tabBackgroundColor,
@@ -328,6 +330,14 @@ class ReorderableTabBar extends StatefulWidget implements PreferredSizeWidget {
   final Color? tabBackgroundColor;
 
   final bool defaultIndicator;
+
+  /// Whether the indicator stays attached to the selected tab while reordering.
+  ///
+  /// Defaults to false, leaving the indicator in the tab strip during a drag.
+  /// When true, the indicator follows the selected tab, including when it is
+  /// pushed by another tab or carried in the drag proxy. The normal animated
+  /// indicator returns after the drop animation completes or the drag cancels.
+  final bool indicatorFollowsDrag;
 
   final OnReorder? onReorder;
 
@@ -543,6 +553,7 @@ class ReorderableTabBar extends StatefulWidget implements PreferredSizeWidget {
 }
 
 class _ReorderableTabBarState extends State<ReorderableTabBar> {
+  final _reorderSession = ValueNotifier<Object?>(null);
   ScrollController? _scrollController;
   TabController? _controller;
   _IndicatorPainter? _indicatorPainter;
@@ -550,6 +561,7 @@ class _ReorderableTabBarState extends State<ReorderableTabBar> {
   int? _currentIndex;
   double? _tabStripWidth;
   List<double> xOffsets = [];
+  List<double> _tabLabelWidths = [];
   double? height;
   bool isScrollToCurrentIndex = false;
   Reordered? isReordered;
@@ -688,6 +700,7 @@ class _ReorderableTabBarState extends State<ReorderableTabBar> {
 
   @override
   void dispose() {
+    _reorderSession.dispose();
     _indicatorPainter?.dispose();
     _reorderController?.dispose();
     _scrollController?.dispose();
@@ -851,8 +864,13 @@ class _ReorderableTabBarState extends State<ReorderableTabBar> {
             break;
         }
       }
+      final labelWidths = [
+        for (final key in _tabKeys) key.currentContext?.size?.width ?? 0.0,
+      ];
       if ((_tabStripWidth ?? 0).floor() != width.floor() ||
-          !listEquals<double>(offsets, xOffsets)) {
+          !listEquals<double>(offsets, xOffsets) ||
+          !listEquals<double>(labelWidths, _tabLabelWidths)) {
+        _tabLabelWidths = labelWidths;
         _saveTabOffsets(offsets, textDirection, width);
         if (!widget.isScrollable) {
           _initialScrollOffset();
@@ -872,25 +890,31 @@ class _ReorderableTabBarState extends State<ReorderableTabBar> {
     int newIndex = isReordered!.newIndex;
 
     if (oldIndex == _currentIndex) {
-      _checkAndAnimateTo(newIndex);
+      _updateIndexAfterReorder(newIndex);
     } else if (oldIndex > (_currentIndex ?? 0)) {
       if (newIndex < (_currentIndex ?? 0) || newIndex == _currentIndex) {
         int index = (_currentIndex ?? 0);
-        _checkAndAnimateTo(++index);
+        _updateIndexAfterReorder(++index);
       }
     } else {
       if (newIndex > (_currentIndex ?? 0) || newIndex == _currentIndex) {
         int index = (_currentIndex ?? 0);
-        _checkAndAnimateTo(--index);
+        _updateIndexAfterReorder(--index);
       }
     }
 
     isReordered = null;
   }
 
-  void _checkAndAnimateTo(int index) {
+  void _updateIndexAfterReorder(int index) {
     if (index >= 0 && index < widget.tabs.length) {
-      _controller!.animateTo(index);
+      if (widget.indicatorFollowsDrag) {
+        // The same tab already reached this slot in the drop animation.
+        // Animating its new index would replay the move from the old slot.
+        _controller!.index = index;
+      } else {
+        _controller!.animateTo(index);
+      }
     }
   }
 
@@ -905,6 +929,42 @@ class _ReorderableTabBarState extends State<ReorderableTabBar> {
       },
     );
   }
+
+  void _finishReorder(Object? session) {
+    // Proxy disposal can happen during layout, including after cancellation.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && identical(_reorderSession.value, session)) {
+        _reorderSession.value = null;
+      }
+    });
+  }
+
+  Widget _buildReorderIndicator(int index) => LayoutBuilder(
+    builder: (context, constraints) {
+      final painter = _indicatorPainter;
+      if (painter == null ||
+          painter._currentTabOffsets == null ||
+          index > painter.maxTabIndex ||
+          index >= _tabLabelWidths.length) {
+        return const SizedBox.shrink();
+      }
+      final offsets = painter._currentTabOffsets!;
+      final slotLeft = math.min(offsets[index], offsets[index + 1]);
+      final rect = painter.indicatorRect(
+        Size(constraints.maxWidth, widget.indicatorWeight),
+        index,
+        labelWidth: _tabLabelWidths[index],
+      );
+      return Stack(
+        children: [
+          Positioned.fromRect(
+            rect: rect.shift(Offset(-slotLeft, 0)),
+            child: DecoratedBox(decoration: _indicator),
+          ),
+        ],
+      );
+    },
+  );
 
   Widget _buildTabBar(BuildContext context) {
     assert(debugCheckHasMaterialLocalizations(context));
@@ -1069,19 +1129,41 @@ class _ReorderableTabBarState extends State<ReorderableTabBar> {
         }
       }
 
+      child = _TabStyle(
+        animation: kAlwaysDismissedAnimation,
+        selected: false,
+        labelColor: widget.labelColor,
+        unselectedLabelColor: widget.unselectedLabelColor,
+        labelStyle: widget.labelStyle,
+        unselectedLabelStyle: widget.unselectedLabelStyle,
+        child: child,
+      );
+      if (widget.indicatorFollowsDrag) {
+        final index = i;
+        child = ValueListenableBuilder<Object?>(
+          valueListenable: _reorderSession,
+          child: child,
+          builder: (context, session, child) => Stack(
+            fit: StackFit.passthrough,
+            children: [
+              child!,
+              if (session != null && index == _controller?.index)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  height: widget.indicatorWeight,
+                  child: IgnorePointer(child: _buildReorderIndicator(index)),
+                ),
+            ],
+          ),
+        );
+      }
       wrappedTabs[i] = SizedBox(
         key: _tabExtendKeys[i],
         width: tabWidth,
         height: height,
-        child: _TabStyle(
-          animation: kAlwaysDismissedAnimation,
-          selected: false,
-          labelColor: widget.labelColor,
-          unselectedLabelColor: widget.unselectedLabelColor,
-          labelStyle: widget.labelStyle,
-          unselectedLabelStyle: widget.unselectedLabelStyle,
-          child: child,
-        ),
+        child: child,
       );
     }
     tabBar = Stack(
@@ -1097,12 +1179,17 @@ class _ReorderableTabBarState extends State<ReorderableTabBar> {
             scrollController: _reorderController,
             scrollDirection: Axis.horizontal,
             children: wrappedTabs,
+            onReorderStart: (index) => _reorderSession.value = Object(),
             proxyDecorator: (child, index, anim) {
-              return Material(
-                color:
-                    widget.reorderingTabBackgroundColor ?? Colors.transparent,
-                borderRadius: widget.tabBorderRadius,
-                child: child,
+              final session = _reorderSession.value;
+              return _ReorderProxy(
+                onDisposed: () => _finishReorder(session),
+                child: Material(
+                  color:
+                      widget.reorderingTabBackgroundColor ?? Colors.transparent,
+                  borderRadius: widget.tabBorderRadius,
+                  child: child,
+                ),
               );
             },
             onReorderItem: (oldIndex, newIndex) {
@@ -1139,13 +1226,40 @@ class _ReorderableTabBarState extends State<ReorderableTabBar> {
         physics: widget.physics,
         controller: _scrollController,
         scrollDirection: Axis.horizontal,
-        child: CustomPaint(
-          painter: _indicatorPainter,
+        child: ValueListenableBuilder<Object?>(
+          valueListenable: _reorderSession,
           child: SizedBox(height: widget.indicatorWeight, width: width),
+          builder: (context, session, child) => CustomPaint(
+            painter: widget.indicatorFollowsDrag && session != null
+                ? null
+                : _indicatorPainter,
+            child: child,
+          ),
         ),
       ),
     );
   }
+}
+
+class _ReorderProxy extends StatefulWidget {
+  const _ReorderProxy({required this.onDisposed, required this.child});
+
+  final VoidCallback onDisposed;
+  final Widget child;
+
+  @override
+  State<_ReorderProxy> createState() => _ReorderProxyState();
+}
+
+class _ReorderProxyState extends State<_ReorderProxy> {
+  @override
+  void dispose() {
+    widget.onDisposed();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 // Hand coded defaults based on Material Design 2.
