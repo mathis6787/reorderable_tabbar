@@ -1,5 +1,10 @@
 ## Unreleased
 
+* Add `reserveDragHandleSpace` for compact, stable desktop tab geometry when toggling reordering.
+
+* Place desktop drag handles before tab labels with reserved spacing and six-dot icons.
+* Add `dragHandleBuilder` to customize the leading handle visual.
+
 * Match Material tab hover, focus and pressed overlays, including tab theme overrides.
 * Draw the Material 3 divider using `dividerColor` and `dividerHeight` from the widget or tab theme.
 * Expose tab roles and selection while retaining accessible reorder actions.

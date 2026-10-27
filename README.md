@@ -71,10 +71,21 @@ DefaultTabController(
 tab forward. Update the tabs and page order together in the callback; the bar
 keeps the selected page associated with the moved content.
 
-By default, desktop platforms show drag handles and mobile platforms use a
-long press. To drag from anywhere on a tab, set `buildDefaultDragHandles: false`.
+By default, desktop platforms show six-dot drag handles before each label,
+with compact spacing and a grab cursor. The 22-point handle slot reuses up to
+12 points of existing leading padding, adding only 10 points per tab with the
+standard padding. Disabled handles restore normal padding unless
+`reserveDragHandleSpace` is enabled. Mobile platforms use a long press.
+Use `dragHandleBuilder` to customize the handle visual; the package supplies
+the drag listener and spacing. Only the handle starts a desktop reorder, so
+clicking the label continues to select the tab. To drag from anywhere on a tab, set `buildDefaultDragHandles: false`.
 Then `useDelayedDragStartListener` chooses between a long press (`true`) and an
 immediate drag (`false`, the default).
+
+Set `reserveDragHandleSpace: true` to keep desktop labels and tab widths stable
+when toggling `enableReordering`. This uses a compact 22-point slot and reuses up
+to 12 points of the existing leading padding. Disabled handles leave an empty
+slot without drag interactions or accessibility nodes. Mobile layout is unchanged.
 
 Style the bar with `TabBarThemeData` in `ThemeData.tabBarTheme`, or override the
 label and indicator properties on `ReorderableTabBar`. `overlayColor` accepts a

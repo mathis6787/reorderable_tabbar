@@ -37,7 +37,7 @@ void main() {
         );
         await tester.pumpAndSettle();
         final state = tester.state<_TabsState>(find.byType(_Tabs));
-        expect(find.byIcon(Icons.drag_handle), findsNothing);
+        expect(find.byIcon(Icons.drag_indicator), findsNothing);
         final blocked = await _drag(
           tester,
           find.text('Stock'),
@@ -58,7 +58,7 @@ void main() {
 
         await tester.tap(find.text('Enable reordering'));
         await tester.pumpAndSettle();
-        final handles = find.byIcon(Icons.drag_handle);
+        final handles = find.byIcon(Icons.drag_indicator);
         final target = config.platform == TargetPlatform.macOS && config.handles
             ? handles.first
             : find.text('Stock');
@@ -69,7 +69,7 @@ void main() {
         expect(state.reorders, 1);
         await tester.tap(find.text('Disable reordering'));
         await tester.pumpAndSettle();
-        expect(find.byIcon(Icons.drag_handle), findsNothing);
+        expect(find.byIcon(Icons.drag_indicator), findsNothing);
         final blockedAgain = await _drag(
           tester,
           find.text('Stock'),

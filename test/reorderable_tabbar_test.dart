@@ -203,7 +203,7 @@ void main() {
 
   testWidgets('default desktop handles reorder with a mouse', (tester) async {
     await mount(tester, defaultHandles: true);
-    final handles = find.byIcon(Icons.drag_handle);
+    final handles = find.byIcon(Icons.drag_indicator);
     expect(handles, findsNWidgets(3));
     final start = tester.getCenter(handles.first);
     final end = tester.getCenter(handles.last) + const Offset(250, 0);

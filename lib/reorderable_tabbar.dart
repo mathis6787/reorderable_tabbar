@@ -9,6 +9,8 @@ import 'package:material_ui/material_ui.dart';
 
 const double _kTabHeight = 46.0;
 const double _kTextAndIconTabHeight = 72.0;
+const double _kCompactDragHandleWidth = 20.0;
+const double _kCompactDragHandleGap = 2.0;
 
 class _TabStyle extends AnimatedWidget {
   const _TabStyle({
@@ -318,6 +320,8 @@ class ReorderableTabBar extends StatefulWidget implements PreferredSizeWidget {
     this.reorderingTabBackgroundColor,
     this.tabBackgroundColor,
     this.buildDefaultDragHandles = true,
+    this.dragHandleBuilder,
+    this.reserveDragHandleSpace = false,
     this.enableReordering = true,
     this.useDelayedDragStartListener = false,
   }) : assert(indicator != null || (indicatorWeight > 0.0));
@@ -329,10 +333,36 @@ class ReorderableTabBar extends StatefulWidget implements PreferredSizeWidget {
   /// becomes false. Defaults to true.
   final bool enableReordering;
 
-  /// if false use `useDelayedDragStartListener` variable
+  /// Whether desktop tabs show a leading drag handle.
+  ///
+  /// Defaults to `true`. Mobile platforms use a long press on the whole tab.
+  /// When `false`, the whole tab starts a drag according to
+  /// [useDelayedDragStartListener]. Handles and dragging are disabled when
+  /// [enableReordering] is `false`.
   final bool buildDefaultDragHandles;
 
-  /// uses the widget `ReorderableDelayedDragStartListener` if true and `ReorderableDragStartListener` if false
+  /// The builder for the visual inside each leading desktop drag handle.
+  ///
+  /// Defaults to a 20-point [Icons.drag_indicator] in the theme's secondary
+  /// foreground color. The package provides the drag listener, pointer cursor,
+  /// spacing and a 20-point-wide area for the returned widget. The builder is
+  /// used only when [buildDefaultDragHandles] and [enableReordering] are `true`
+  /// on a desktop platform.
+  final IndexedWidgetBuilder? dragHandleBuilder;
+
+  /// Whether desktop tabs reserve compact handle space in both editing modes.
+  ///
+  /// Defaults to `false`. When `true`, label positions and tab widths stay
+  /// unchanged as [enableReordering] changes. The leading slot is 22 points
+  /// wide and reuses up to 12 points of the existing leading label padding.
+  /// The empty slot has no drag listener, cursor or semantics when reordering
+  /// is disabled. Applies only when [buildDefaultDragHandles] is `true` on a
+  /// desktop platform.
+  final bool reserveDragHandleSpace;
+
+  /// Whether dragging the whole tab requires a long press.
+  ///
+  /// Applies when [buildDefaultDragHandles] is `false`. Defaults to `false`.
   final bool useDelayedDragStartListener;
 
   final BorderRadius? tabBorderRadius;
@@ -1017,6 +1047,19 @@ class _ReorderableTabBarState extends State<ReorderableTabBar> {
         defaults.dividerHeight ??
         0;
 
+    final hasDesktopDragHandle =
+        widget.buildDefaultDragHandles &&
+        switch (theme.platform) {
+          TargetPlatform.linux ||
+          TargetPlatform.windows ||
+          TargetPlatform.macOS => true,
+          _ => false,
+        };
+    final usesLeadingDragHandle =
+        hasDesktopDragHandle && widget.enableReordering;
+    final reservesHandleSpace =
+        hasDesktopDragHandle && widget.reserveDragHandleSpace;
+
     final List<Widget> wrappedTabs = List<Widget>.generate(widget.tabs.length, (
       int index,
     ) {
@@ -1041,15 +1084,36 @@ class _ReorderableTabBarState extends State<ReorderableTabBar> {
         }
       }
 
+      final direction = Directionality.of(context);
+      var padding =
+          (adjustedPadding ??
+                  widget.labelPadding ??
+                  tabBarTheme.labelPadding ??
+                  kTabLabelPadding)
+              .resolve(direction);
+      if (usesLeadingDragHandle || reservesHandleSpace) {
+        padding = switch (direction) {
+          TextDirection.ltr => padding.copyWith(
+            left: math.max(0.0, padding.left - 12),
+          ),
+          TextDirection.rtl => padding.copyWith(
+            right: math.max(0.0, padding.right - 12),
+          ),
+        };
+      }
+      final tab = KeyedSubtree(key: _tabKeys[index], child: widget.tabs[index]);
       return Center(
         heightFactor: 1.0,
         child: Padding(
-          padding:
-              adjustedPadding ??
-              widget.labelPadding ??
-              tabBarTheme.labelPadding ??
-              kTabLabelPadding,
-          child: KeyedSubtree(key: _tabKeys[index], child: widget.tabs[index]),
+          padding: padding,
+          child: usesLeadingDragHandle || reservesHandleSpace
+              ? _withDefaultDragHandle(
+                  context,
+                  tab,
+                  index,
+                  visible: usesLeadingDragHandle,
+                )
+              : tab,
         ),
       );
     });
@@ -1171,8 +1235,9 @@ class _ReorderableTabBarState extends State<ReorderableTabBar> {
     for (var i = 0; i < wrappedTabs.length; i++) {
       Widget child = wrappedTabs[i];
 
-      if (widget.enableReordering && !widget.buildDefaultDragHandles) {
-        if (widget.useDelayedDragStartListener) {
+      if (widget.enableReordering && !usesLeadingDragHandle) {
+        if (widget.buildDefaultDragHandles ||
+            widget.useDelayedDragStartListener) {
           child = ReorderableDelayedDragStartListener(index: i, child: child);
         } else {
           child = ReorderableDragStartListener(index: i, child: child);
@@ -1242,8 +1307,7 @@ class _ReorderableTabBarState extends State<ReorderableTabBar> {
             slivers: [
               SliverReorderableList(
                 itemCount: wrappedTabs.length,
-                itemBuilder: (context, index) =>
-                    _withDefaultDragHandle(context, wrappedTabs[index], index),
+                itemBuilder: (context, index) => wrappedTabs[index],
                 onReorderStart: (index) => _reorderSession.value = Object(),
                 proxyDecorator: (child, index, anim) {
                   final session = _reorderSession.value;
@@ -1281,53 +1345,53 @@ class _ReorderableTabBarState extends State<ReorderableTabBar> {
     return tabBar;
   }
 
-  Widget _withDefaultDragHandle(BuildContext context, Widget item, int index) {
-    if (!widget.enableReordering || !widget.buildDefaultDragHandles) {
-      return item;
-    }
-    final key = ValueKey(_tabExtendKeys[index]);
-    switch (Theme.of(context).platform) {
-      case TargetPlatform.linux:
-      case TargetPlatform.windows:
-      case TargetPlatform.macOS:
-        return Stack(
-          key: key,
-          children: [
-            item,
-            Positioned.directional(
-              textDirection: Directionality.of(context),
-              start: 0,
-              end: 0,
-              bottom: 8,
-              child: Align(
-                alignment: AlignmentDirectional.bottomCenter,
-                child: ReorderableDragStartListener(
-                  index: index,
-                  child: ValueListenableBuilder<Object?>(
-                    valueListenable: _reorderSession,
-                    child: const Icon(Icons.drag_handle),
-                    builder: (context, session, child) => MouseRegion(
-                      cursor: session == null
-                          ? SystemMouseCursors.grab
-                          : SystemMouseCursors.grabbing,
-                      child: child,
-                    ),
-                  ),
+  Widget _withDefaultDragHandle(
+    BuildContext context,
+    Widget tab,
+    int index, {
+    required bool visible,
+  }) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      if (!visible)
+        const SizedBox(
+          width: _kCompactDragHandleWidth + _kCompactDragHandleGap,
+          height: _kTabHeight,
+        )
+      else
+        ReorderableDragStartListener(
+          index: index,
+          child: ValueListenableBuilder<Object?>(
+            valueListenable: _reorderSession,
+            child: Padding(
+              padding: const EdgeInsetsDirectional.only(
+                end: _kCompactDragHandleGap,
+              ),
+              child: SizedBox(
+                width: _kCompactDragHandleWidth,
+                height: _kTabHeight,
+                child: Center(
+                  child:
+                      widget.dragHandleBuilder?.call(context, index) ??
+                      Icon(
+                        Icons.drag_indicator,
+                        size: 20,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                 ),
               ),
             ),
-          ],
-        );
-      case TargetPlatform.android:
-      case TargetPlatform.iOS:
-      case TargetPlatform.fuchsia:
-        return ReorderableDelayedDragStartListener(
-          key: key,
-          index: index,
-          child: item,
-        );
-    }
-  }
+            builder: (context, session, child) => MouseRegion(
+              cursor: session == null
+                  ? SystemMouseCursors.grab
+                  : SystemMouseCursors.grabbing,
+              child: child,
+            ),
+          ),
+        ),
+      Flexible(child: tab),
+    ],
+  );
 
   Positioned getIndicatorPainter() {
     double width = _tabStripWidth!;
