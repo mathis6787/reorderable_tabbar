@@ -1,5 +1,9 @@
 ## Unreleased
 
+* Add `showDisabledDragHandles` to retain handle visuals while reordering is locked.
+
+* Keep tab semantics on the complete item when a tab contains an inline text field.
+
 * Add `reserveDragHandleSpace` for compact, stable desktop tab geometry when toggling reordering.
 
 * Place desktop drag handles before tab labels with reserved spacing and six-dot icons.

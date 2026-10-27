@@ -102,6 +102,9 @@ selection and tab roles, including the accessible move actions.
 Set `enableReordering: false` to disable dragging and hide drag handles while
 keeping tab selection and scrolling available. It defaults to `true` and can be
 changed at runtime, for example when entering or leaving a customization mode.
+Set `showDisabledDragHandles: true` to keep desktop handles visible while locked,
+for example during inline renaming. Disabled handles do not start a drag or show
+a grab cursor.
 
 Set `indicatorFollowsDrag: true` to keep the selected indicator attached to its
 tab during reordering, including in the drag proxy and when another tab pushes

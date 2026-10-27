@@ -9,6 +9,7 @@ Future<void> _mount(
   bool scrollable = true,
   bool dark = false,
   bool reserveSpace = false,
+  bool showDisabledHandles = false,
   TargetPlatform platform = TargetPlatform.macOS,
   IndexedWidgetBuilder? handleBuilder,
 }) async {
@@ -29,6 +30,7 @@ Future<void> _mount(
                 scrollable: scrollable,
                 handleBuilder: handleBuilder,
                 reserveSpace: reserveSpace,
+                showDisabledHandles: showDisabledHandles,
               ),
             ),
           ),
@@ -191,6 +193,41 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('disabled handles remain visible without enabling dragging', (
+    tester,
+  ) async {
+    await _mount(tester, reserveSpace: true, showDisabledHandles: true);
+    final state = tester.state<_TabsState>(find.byType(_Tabs));
+    final positions = [
+      for (var i = 0; i < 3; i++)
+        tester.getRect(find.byIcon(Icons.drag_indicator).at(i)),
+    ];
+    state.setEnabled(false);
+    await tester.pumpAndSettle();
+    expect(find.byIcon(Icons.drag_indicator), findsNWidgets(3));
+    for (var i = 0; i < 3; i++) {
+      expect(
+        tester.getRect(find.byIcon(Icons.drag_indicator).at(i)),
+        positions[i],
+      );
+    }
+    final start = tester.getCenter(find.byIcon(Icons.drag_indicator).first);
+    final gesture = await tester.startGesture(
+      start,
+      kind: PointerDeviceKind.mouse,
+    );
+    await gesture.moveBy(const Offset(250, 0));
+    await tester.pump(const Duration(milliseconds: 600));
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(state.reorders, 0);
+    expect(state.tabs, ['Stock', 'Orders', 'Equipment']);
+    await tester.tap(find.text('Orders'));
+    await tester.pumpAndSettle();
+    expect(state.taps, [1]);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('custom handle builder replaces only the visual', (tester) async {
     final built = <int>[];
     await _mount(
@@ -248,10 +285,12 @@ class _Tabs extends StatefulWidget {
     required this.scrollable,
     this.handleBuilder,
     this.reserveSpace = false,
+    this.showDisabledHandles = false,
   });
   final bool scrollable;
   final IndexedWidgetBuilder? handleBuilder;
   final bool reserveSpace;
+  final bool showDisabledHandles;
 
   @override
   State<_Tabs> createState() => _TabsState();
@@ -275,6 +314,7 @@ class _TabsState extends State<_Tabs> {
       dragHandleBuilder: widget.handleBuilder,
       reserveDragHandleSpace: widget.reserveSpace,
       enableReordering: enabled,
+      showDisabledDragHandles: widget.showDisabledHandles,
       onTap: taps.add,
       onReorder: (oldIndex, newIndex) => setState(() {
         reorders++;

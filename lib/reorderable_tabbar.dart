@@ -321,6 +321,7 @@ class ReorderableTabBar extends StatefulWidget implements PreferredSizeWidget {
     this.tabBackgroundColor,
     this.buildDefaultDragHandles = true,
     this.dragHandleBuilder,
+    this.showDisabledDragHandles = false,
     this.reserveDragHandleSpace = false,
     this.enableReordering = true,
     this.useDelayedDragStartListener = false,
@@ -328,8 +329,8 @@ class ReorderableTabBar extends StatefulWidget implements PreferredSizeWidget {
 
   /// Whether tabs can be reordered by dragging.
   ///
-  /// When false, drag handles and drag listeners are disabled while taps and
-  /// scrolling remain available. A pending drop cannot reorder tabs after this
+  /// When false, drag listeners are disabled while taps and scrolling remain
+  /// available. Handles are hidden unless [showDisabledDragHandles] is `true`. A pending drop cannot reorder tabs after this
   /// becomes false. Defaults to true.
   final bool enableReordering;
 
@@ -337,8 +338,8 @@ class ReorderableTabBar extends StatefulWidget implements PreferredSizeWidget {
   ///
   /// Defaults to `true`. Mobile platforms use a long press on the whole tab.
   /// When `false`, the whole tab starts a drag according to
-  /// [useDelayedDragStartListener]. Handles and dragging are disabled when
-  /// [enableReordering] is `false`.
+  /// [useDelayedDragStartListener]. Dragging is disabled when [enableReordering]
+  /// is `false`; [showDisabledDragHandles] controls whether handles stay visible.
   final bool buildDefaultDragHandles;
 
   /// The builder for the visual inside each leading desktop drag handle.
@@ -346,17 +347,23 @@ class ReorderableTabBar extends StatefulWidget implements PreferredSizeWidget {
   /// Defaults to a 20-point [Icons.drag_indicator] in the theme's secondary
   /// foreground color. The package provides the drag listener, pointer cursor,
   /// spacing and a 20-point-wide area for the returned widget. The builder is
-  /// used only when [buildDefaultDragHandles] and [enableReordering] are `true`
-  /// on a desktop platform.
+  /// used only when a desktop handle is visible.
   final IndexedWidgetBuilder? dragHandleBuilder;
+
+  /// Whether desktop handles stay visible while reordering is disabled.
+  ///
+  /// Defaults to `false`. When `true`, handles retain their normal appearance
+  /// without a drag gesture or grab cursor. Applies only when
+  /// [buildDefaultDragHandles] is `true` on a desktop platform.
+  final bool showDisabledDragHandles;
 
   /// Whether desktop tabs reserve compact handle space in both editing modes.
   ///
   /// Defaults to `false`. When `true`, label positions and tab widths stay
   /// unchanged as [enableReordering] changes. The leading slot is 22 points
   /// wide and reuses up to 12 points of the existing leading label padding.
-  /// The empty slot has no drag listener, cursor or semantics when reordering
-  /// is disabled. Applies only when [buildDefaultDragHandles] is `true` on a
+  /// When handles are hidden, the empty slot has no drag listener, cursor or
+  /// semantics. Applies only when [buildDefaultDragHandles] is `true` on a
   /// desktop platform.
   final bool reserveDragHandleSpace;
 
@@ -1056,7 +1063,8 @@ class _ReorderableTabBarState extends State<ReorderableTabBar> {
           _ => false,
         };
     final usesLeadingDragHandle =
-        hasDesktopDragHandle && widget.enableReordering;
+        hasDesktopDragHandle &&
+        (widget.enableReordering || widget.showDisabledDragHandles);
     final reservesHandleSpace =
         hasDesktopDragHandle && widget.reserveDragHandleSpace;
 
@@ -1188,6 +1196,7 @@ class _ReorderableTabBarState extends State<ReorderableTabBar> {
             tabBarTheme.mouseCursor?.resolve(selectedState) ??
             SystemMouseCursors.click,
         splashFactory: tabBarTheme.splashFactory ?? defaults.splashFactory,
+        excludeFromSemantics: true,
         onTap: () async {
           _handleTap(index);
         },
@@ -1201,23 +1210,7 @@ class _ReorderableTabBarState extends State<ReorderableTabBar> {
           ),
           child: Padding(
             padding: EdgeInsets.only(bottom: widget.indicatorWeight),
-            child: Semantics(
-              role: SemanticsRole.tab,
-              child: Stack(
-                children: <Widget>[
-                  wrappedTabs[index],
-                  Semantics(
-                    selected: index == _currentIndex,
-                    label: kIsWeb
-                        ? null
-                        : localizations.tabLabel(
-                            tabIndex: index + 1,
-                            tabCount: tabCount,
-                          ),
-                  ),
-                ],
-              ),
-            ),
+            child: wrappedTabs[index],
           ),
         ),
       );
@@ -1307,7 +1300,19 @@ class _ReorderableTabBarState extends State<ReorderableTabBar> {
             slivers: [
               SliverReorderableList(
                 itemCount: wrappedTabs.length,
-                itemBuilder: (context, index) => wrappedTabs[index],
+                itemBuilder: (context, index) => Semantics(
+                  key: ValueKey(_tabExtendKeys[index]),
+                  role: SemanticsRole.tab,
+                  selected: index == _currentIndex,
+                  label: kIsWeb
+                      ? null
+                      : localizations.tabLabel(
+                          tabIndex: index + 1,
+                          tabCount: tabCount,
+                        ),
+                  onTap: () => _handleTap(index),
+                  child: wrappedTabs[index],
+                ),
                 onReorderStart: (index) => _reorderSession.value = Object(),
                 proxyDecorator: (child, index, anim) {
                   final session = _reorderSession.value;
@@ -1361,6 +1366,7 @@ class _ReorderableTabBarState extends State<ReorderableTabBar> {
       else
         ReorderableDragStartListener(
           index: index,
+          enabled: widget.enableReordering,
           child: ValueListenableBuilder<Object?>(
             valueListenable: _reorderSession,
             child: Padding(
@@ -1382,7 +1388,9 @@ class _ReorderableTabBarState extends State<ReorderableTabBar> {
               ),
             ),
             builder: (context, session, child) => MouseRegion(
-              cursor: session == null
+              cursor: !widget.enableReordering
+                  ? SystemMouseCursors.basic
+                  : session == null
                   ? SystemMouseCursors.grab
                   : SystemMouseCursors.grabbing,
               child: child,
